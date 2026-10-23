@@ -25,13 +25,15 @@ abstract class PreparedAppUpdate {
 
 class AppUpdater implements AppInstaller {
   AppUpdater(this.client, {Directory? installation, String? platform})
-    : installation = installation ?? File(Platform.resolvedExecutable).parent,
+    : installation =
+          installation ?? applicationDirectory(Platform.resolvedExecutable),
       platform =
           platform ??
           switch (Abi.current()) {
             Abi.linuxX64 => 'linux-x64',
             Abi.linuxArm64 => 'linux-arm64',
             Abi.windowsX64 => 'windows-x64',
+            Abi.macosArm64 => 'macos-arm64',
             _ => 'unsupported',
           };
   final ReleaseClient client;
@@ -43,7 +45,12 @@ class AppUpdater implements AppInstaller {
     GitHubRelease release,
     void Function(String) status,
   ) async {
-    if (!['linux-x64', 'linux-arm64', 'windows-x64'].contains(platform)) {
+    if (![
+      'linux-x64',
+      'linux-arm64',
+      'windows-x64',
+      'macos-arm64',
+    ].contains(platform)) {
       throw const ReleaseFailure(
         'Automatic installation is not available for this operating system yet.',
       );
@@ -56,7 +63,14 @@ class AppUpdater implements AppInstaller {
     final helperName = windows
         ? 'chromagician-update.exe'
         : 'chromagician-update';
-    final helper = File(p.join(target.path, 'libexec', helperName));
+    final helper = File(
+      p.join(
+        target.path,
+        p.dirname(bundleExecutable(target)),
+        'libexec',
+        helperName,
+      ),
+    );
     if (!await helper.exists()) {
       throw const ReleaseFailure(
         'The update tools are missing. Reinstall the complete app.',
@@ -258,6 +272,8 @@ Future<void> extractAppUpdate(
   if (platform == 'windows-x64') {
     return extractWindowsUpdate(archivePath, workPath, version);
   }
+  final macos = platform == 'macos-arm64';
+  final archiveRoot = macos ? 'ChroMagician.app' : 'ChroMagician';
   const limit = 512 * 1024 * 1024;
   final tar = File(p.join(workPath, 'payload.tar'));
   final sink = tar.openWrite();
@@ -284,22 +300,49 @@ Future<void> extractAppUpdate(
     var expanded = 0;
     for (final entry in decoder.files) {
       final name = p.posix.normalize(entry.filename);
-      if (!['', '0', '5'].contains(entry.typeFlag) ||
+      if (!(macos ? ['', '0', '5', '2'] : ['', '0', '5']).contains(
+            entry.typeFlag,
+          ) ||
           entry.filename.contains('\\') ||
           entry.filename.contains('\u0000') ||
           entry.filename.split('/').contains('..') ||
-          !(name == 'ChroMagician' || p.posix.isWithin('ChroMagician', name)) ||
+          !(name == archiveRoot || p.posix.isWithin(archiveRoot, name)) ||
           !names.add(name)) {
         throw const ReleaseFailure(
           'The app archive contains an invalid path or file.',
         );
       }
     }
+    final links = <String, String>{};
+    for (final entry in archive.where((entry) => entry.isSymbolicLink)) {
+      final name = p.posix.normalize(entry.name);
+      final link = entry.symbolicLink!;
+      final destination = p.posix.normalize(
+        p.posix.join(p.posix.dirname(name), link),
+      );
+      if (!macos ||
+          p.posix.isAbsolute(link) ||
+          link.contains('\\') ||
+          link.contains('\u0000') ||
+          !p.posix.isWithin(archiveRoot, destination)) {
+        throw const ReleaseFailure('The app archive contains an unsafe link.');
+      }
+      links[name] = link;
+    }
+    // Never write through a symlink, regardless of archive entry order.
+    for (final entry in archive) {
+      if (links.keys.any(
+        (link) => p.posix.isWithin(link, p.posix.normalize(entry.name)),
+      )) {
+        throw const ReleaseFailure('The app archive writes through a link.');
+      }
+    }
     for (final entry in archive) {
       expanded += entry.size;
-      if (entry.isSymbolicLink || expanded > limit) {
+      if (expanded > limit) {
         throw const ReleaseFailure('The app archive is invalid.');
       }
+      if (entry.isSymbolicLink) continue;
       final path = p.join(workPath, p.posix.normalize(entry.name));
       if (entry.isDirectory) {
         await Directory(path).create(recursive: true);
@@ -314,13 +357,70 @@ Future<void> extractAppUpdate(
         if ((entry.mode & 0x49) != 0) await executableMode(path, '755');
       }
     }
+    for (final link in links.entries) {
+      final path = p.join(workPath, link.key);
+      await Directory(p.dirname(path)).create(recursive: true);
+      await Link(path).create(link.value);
+    }
+    if (macos) {
+      final root = p.join(workPath, archiveRoot);
+      for (final name in links.keys) {
+        final resolved = await Link(
+          p.join(workPath, name),
+        ).resolveSymbolicLinks();
+        if (!p.isWithin(root, resolved)) {
+          throw const ReleaseFailure(
+            'The app archive contains an unsafe link.',
+          );
+        }
+      }
+    }
   } finally {
     input.closeSync();
     await tar.delete();
   }
-  final bundle = Directory(p.join(workPath, 'ChroMagician'));
+  final bundle = Directory(p.join(workPath, archiveRoot));
   if (await bundleVersion(bundle) != version) {
     throw const ReleaseFailure('The app version does not match the release.');
+  }
+  if (macos) {
+    for (final name in [
+      'Contents/MacOS/chromatic_pc_backup',
+      'Contents/MacOS/libexec/chromagician-update',
+      'Contents/MacOS/libexec/chromatic-backup',
+    ]) {
+      final file = await File(p.join(bundle.path, name)).open();
+      try {
+        final bytes = await file.read(8);
+        if (bytes.length != 8 ||
+            bytes[0] != 0xcf ||
+            bytes[1] != 0xfa ||
+            bytes[2] != 0xed ||
+            bytes[3] != 0xfe ||
+            bytes[4] != 12 ||
+            bytes[5] != 0 ||
+            bytes[6] != 0 ||
+            bytes[7] != 1) {
+          throw const ReleaseFailure(
+            'The app update is not for Apple Silicon.',
+          );
+        }
+      } finally {
+        await file.close();
+      }
+    }
+    if (Platform.isMacOS) {
+      final signature = await Process.run('/usr/bin/codesign', [
+        '--verify',
+        '--deep',
+        '--strict',
+        bundle.path,
+      ]);
+      if (signature.exitCode != 0) {
+        throw const ReleaseFailure('The Mac app signature is invalid.');
+      }
+    }
+    return;
   }
   final machine = platform == 'linux-x64' ? 62 : 183;
   for (final name in [

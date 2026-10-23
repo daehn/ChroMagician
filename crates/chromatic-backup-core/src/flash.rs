@@ -859,7 +859,7 @@ mod tests {
     fn stock_console_stays_unknown_until_a_real_custom_status_reply() {
         use std::cell::Cell;
         use std::io::Read as _;
-        let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+        let (mut client, mut device) = crate::test_serial_pair().unwrap();
         client.set_baud_rate(115_200).unwrap();
         client.set_timeout(Duration::from_millis(50)).unwrap();
         device.set_timeout(Duration::from_secs(4)).unwrap();
@@ -903,7 +903,7 @@ mod tests {
     fn sleeping_mcu_keeps_confirmed_mode_then_detects_enable_without_reopening() {
         use std::cell::Cell;
         use std::io::Read as _;
-        let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+        let (mut client, mut device) = crate::test_serial_pair().unwrap();
         client.set_baud_rate(115_200).unwrap();
         client.set_timeout(Duration::from_millis(50)).unwrap();
         device.set_timeout(Duration::from_secs(4)).unwrap();
@@ -965,7 +965,7 @@ mod tests {
         use super::*;
         use std::cell::Cell;
         use std::io::Read as _;
-        let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+        let (mut client, mut device) = crate::test_serial_pair().unwrap();
         client.set_timeout(Duration::from_millis(50)).unwrap();
         device.set_timeout(Duration::from_secs(4)).unwrap();
         let peer = std::thread::spawn(move || {
@@ -1285,7 +1285,7 @@ mod tests {
     fn watch_physical_cart(id: Option<u8>) {
         use std::cell::Cell;
         use std::io::Read as _;
-        let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+        let (mut client, mut device) = crate::test_serial_pair().unwrap();
         client.set_timeout(Duration::from_millis(100)).unwrap();
         device.set_timeout(Duration::from_secs(3)).unwrap();
         let mut rom = crate::rom::tests::valid_rom();
@@ -1440,7 +1440,7 @@ mod tests {
     ) -> (Result<Vec<u8>, BackupError>, bool) {
         use std::io::Read as _;
         let response = response.to_vec();
-        let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+        let (mut client, mut device) = crate::test_serial_pair().unwrap();
         client.set_timeout(Duration::from_millis(100)).unwrap();
         device.set_timeout(Duration::from_secs(2)).unwrap();
         let peer = std::thread::spawn(move || {

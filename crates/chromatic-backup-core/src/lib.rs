@@ -1430,3 +1430,13 @@ mod tests {
         importer.info(&fields, &mut |_| {}).unwrap();
     }
 }
+
+// Use the slave endpoint as the client, as with an actual serial device.
+// Darwin rejects arbitrary-baud ioctls on a PTY master.
+#[cfg(all(test, unix))]
+fn test_serial_pair() -> serialport::Result<(test_serial::TestPort, test_serial::TestPort)> {
+    test_serial::pair()
+}
+
+#[cfg(all(test, unix))]
+mod test_serial;

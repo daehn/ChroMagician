@@ -49,8 +49,15 @@ Future<void> main(List<String> arguments) async {
       );
     }
   }
+  if (Platform.isMacOS) {
+    if (Abi.current() != Abi.macosArm64) {
+      throw UnsupportedError('macOS releases currently require Apple Silicon.');
+    }
+    firmwareDirectory ??= p.join(app, '.dart_tool', 'macos-tools');
+  }
   if (firmwareDirectory != null &&
       !Platform.isLinux &&
+      !Platform.isMacOS &&
       !File(p.join(firmwareDirectory, 'manifest.json')).existsSync()) {
     throw ArgumentError('Firmware directory does not contain manifest.json.');
   }
@@ -95,6 +102,13 @@ Future<void> main(List<String> arguments) async {
   if (Platform.isLinux) {
     await run('python3', [
       'tool/package_linux_tools.py',
+      '--output',
+      firmwareDirectory!,
+    ], app);
+  }
+  if (Platform.isMacOS) {
+    await run('python3', [
+      'tool/package_macos_tools.py',
       '--output',
       firmwareDirectory!,
     ], app);
@@ -168,7 +182,7 @@ Future<void> main(List<String> arguments) async {
     p.join(workspace, 'target', 'release', name),
   ).copy(p.join(libexec.path, name));
   if (!Platform.isWindows) await run('chmod', ['755', binary.path], app);
-  if (Platform.isLinux || Platform.isWindows) {
+  if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
     await run('dart', [
       'compile',
       'exe',
@@ -256,6 +270,8 @@ Future<void> packageFirmwareTools(
         'versions': config['versions'],
         'libraries': config['libraries'],
         if (config['pe_imports'] != null) 'pe_imports': config['pe_imports'],
+        if (config['macho_imports'] != null)
+          'macho_imports': config['macho_imports'],
       },
     }),
   );

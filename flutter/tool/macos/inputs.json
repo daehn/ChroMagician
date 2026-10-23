@@ -1,0 +1,7 @@
+{
+  "esptool": {
+    "version": "4.12.0",
+    "url": "https://github.com/espressif/esptool/releases/download/v4.12.0/esptool-v4.12.0-macos-arm64.tar.gz",
+    "sha256": "b3ec710bcae20e93eaa18af4c50084feda8bdbbfd0b5d165b956a29f7c6ff8c3"
+  }
+}

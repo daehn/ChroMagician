@@ -47,6 +47,7 @@ void main() {
   late GitHubRelease release;
   setUp(() async {
     root = await Directory.systemTemp.createTemp('app-updater-test-');
+    root = Directory(await root.resolveSymbolicLinks());
     installed = await Directory(p.join(root.path, 'live app')).create();
     await File(p.join(installed.path, 'data/flutter_assets/version.json'))
         .create(recursive: true)

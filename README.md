@@ -17,6 +17,7 @@ Download an installer from [Releases](https://github.com/cursedtoast2/ChroMagici
 
 - **Windows:** the `Setup.exe` installer.
 - **Linux:** the `.deb` or `.rpm` package for your distribution.
+- **macOS (Apple Silicon):** the `macos-arm64.tar.gz` archive, when published. Extract it and move `ChroMagician.app` to Applications. See [MACOS.md](MACOS.md) for native builds and signing requirements.
 
 Portable packages are also available. Flashing tools and their runtimes are included.
 

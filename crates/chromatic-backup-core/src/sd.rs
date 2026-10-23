@@ -801,7 +801,7 @@ mod tests {
         destination: Option<&str>,
         device_failed: bool,
     ) -> Result<(), BackupError> {
-        let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+        let (mut client, mut device) = crate::test_serial_pair().unwrap();
         client.set_timeout(Duration::from_millis(50)).unwrap();
         device.set_timeout(Duration::from_secs(2)).unwrap();
         let (done, wait) = std::sync::mpsc::channel();
@@ -966,7 +966,7 @@ mod tests {
     #[test]
     fn folder_deletion_validates_then_removes_children_before_parents() {
         for malicious in [false, true] {
-            let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+            let (mut client, mut device) = crate::test_serial_pair().unwrap();
             client.set_timeout(Duration::from_millis(100)).unwrap();
             device.set_timeout(Duration::from_secs(2)).unwrap();
             let peer = std::thread::spawn(move || {
@@ -1049,7 +1049,7 @@ mod tests {
             } else {
                 "/CHROMAGIC/BACKUPS/Crystal (Japan).gbc"
             };
-            let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+            let (mut client, mut device) = crate::test_serial_pair().unwrap();
             client.set_timeout(Duration::from_millis(100)).unwrap();
             device.set_timeout(Duration::from_secs(2)).unwrap();
             let peer = std::thread::spawn(move || {
@@ -1148,7 +1148,7 @@ mod tests {
     #[test]
     fn binary_download_checks_crc_and_preserves_exact_final_length() {
         for corrupt in [false, true] {
-            let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+            let (mut client, mut device) = crate::test_serial_pair().unwrap();
             client.set_timeout(Duration::from_millis(100)).unwrap();
             device.set_timeout(Duration::from_secs(2)).unwrap();
             let data: Vec<u8> = (0..2051).map(|i| u8::try_from(i % 251).unwrap()).collect();

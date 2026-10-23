@@ -22,11 +22,19 @@ void main() {
     'close without approval',
   ]) {
     test('native helper: $scenario', () async {
-      final root = await Directory.systemTemp.createTemp('update-helper-test-');
-      final target = await Directory(p.join(root.path, 'live app')).create();
+      final temporary = await Directory.systemTemp.createTemp(
+        'update-helper-test-',
+      );
+      final root = Directory(await temporary.resolveSymbolicLinks());
+      final target = await Directory(
+        p.join(root.path, Platform.isMacOS ? 'live app.app' : 'live app'),
+      ).create();
       final work = await root.createTemp('.chromagician-update-');
       final incoming = await Directory(
-        p.join(work.path, 'ChroMagician'),
+        p.join(
+          work.path,
+          Platform.isMacOS ? 'ChroMagician.app' : 'ChroMagician',
+        ),
       ).create();
       final marker = File(p.join(root.path, 'started-pid'));
       final restored = File(p.join(root.path, 'restored'));
@@ -47,18 +55,28 @@ void main() {
         await root.delete(recursive: true);
       });
       for (final pair in [(target, '1.0.0'), (incoming, '1.0.1')]) {
+        if (Platform.isMacOS) {
+          await Directory(
+            p.join(pair.$1.path, 'Contents/MacOS'),
+          ).create(recursive: true);
+        }
         final f = File(
-          p.join(pair.$1.path, 'data/flutter_assets/version.json'),
+          p.join(
+            pair.$1.path,
+            Platform.isMacOS
+                ? 'Contents/Frameworks/App.framework/Resources/flutter_assets/version.json'
+                : 'data/flutter_assets/version.json',
+          ),
         );
         await f.create(recursive: true);
         await f.writeAsString(jsonEncode({'version': pair.$2}));
       }
-      final old = File(p.join(target.path, appExecutable));
+      final old = File(p.join(target.path, bundleExecutable(target)));
       await old.writeAsString(
         '#!/bin/sh\nprintf restored > "${restored.path}"\n',
       );
       await Process.run('chmod', ['755', old.path]);
-      final fresh = File(p.join(incoming.path, appExecutable));
+      final fresh = File(p.join(incoming.path, bundleExecutable(incoming)));
       await fresh.writeAsString(
         scenario == 'startup failure'
             ? '#!/bin/sh\nexit 1\n'
@@ -70,7 +88,7 @@ void main() {
           'target': target.path,
           'version': '1.0.1',
           'pid': parent.pid,
-          'identity': await linuxProcessIdentity(parent.pid),
+          'identity': await processIdentity(parent.pid),
         }),
       );
       final native = Platform.environment['CHROMAGIC_TEST_UPDATE_HELPER'];
@@ -112,6 +130,6 @@ void main() {
           await waitFor(restored);
         }
       }
-    }, skip: !Platform.isLinux);
+    }, skip: !Platform.isLinux && !Platform.isMacOS);
   }
 }
