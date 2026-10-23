@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import tarfile
 
 
 def run(*args):
@@ -90,8 +91,10 @@ def package(app, output, identity):
     run('codesign', '--verify', '--deep', '--strict', str(app))
     version = json.loads((app / 'Contents/Resources/version.json').read_text())['version']
     archive = output / f'ChroMagician-{version}-macos-arm64.tar.gz'
-    # bsdtar preserves framework symlinks, executable modes and signed bundle contents.
-    run('/usr/bin/tar', '-czf', str(archive), '-C', str(app.parent), app.name)
+    # Preserve framework links and modes without macOS binary xattr PAX
+    # records, which the portable Dart archive decoder cannot consume.
+    with tarfile.open(archive, 'w:gz', format=tarfile.PAX_FORMAT) as stream:
+        stream.add(app, arcname=app.name)
     sha = hashlib.file_digest(archive.open('rb'), 'sha256').hexdigest()
     Path(str(archive) + '.sha256').write_text(f'{sha}  {archive.name}\n')
     repo = recipe.parent.parent
