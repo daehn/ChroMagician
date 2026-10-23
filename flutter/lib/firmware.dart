@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'backend.dart';
+import 'desktop_resources.dart';
 
 class FirmwareFailure implements Exception {
   const FirmwareFailure(this.message);
@@ -37,7 +38,7 @@ class FirmwareBundle {
     final root = Directory(
       directory ??
           Platform.environment['CHROMATIC_FIRMWARE_DIR'] ??
-          p.join(p.dirname(Platform.resolvedExecutable), 'firmware'),
+          desktopResourcePath('firmware'),
     );
     final file = File(p.join(root.path, 'manifest.json'));
     if (!await file.exists()) {
@@ -193,8 +194,7 @@ class ProcessFirmwareTools implements FirmwareTools {
         ? null
         : Timer(timeout, () {
             timedOut = true;
-            process
-                .kill();
+            process.kill();
           });
     try {
       final code = await process.exitCode;
@@ -482,12 +482,10 @@ class FirmwareInstaller {
       try {
         await log?.flush();
         await log?.close();
-      } on Object {
-      }
+      } on Object {}
       try {
         await staging?.delete(recursive: true);
-      } on Object {
-      }
+      } on Object {}
     }
   }
 }

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import 'firmware.dart';
+import 'desktop_resources.dart';
 import 'releases.dart';
 
 class FirmwareReleases {
@@ -203,7 +204,7 @@ Future<FirmwareBundle> firmwareToolConfiguration({String? directory}) async {
   final root = Directory(
     directory ??
         Platform.environment['CHROMATIC_FIRMWARE_DIR'] ??
-        p.join(p.dirname(Platform.resolvedExecutable), 'firmware'),
+        desktopResourcePath('firmware'),
   ).absolute;
   final manifest = File(p.join(root.path, 'manifest.json'));
   final tools = <String, List<String>>{

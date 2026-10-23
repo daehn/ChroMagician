@@ -17,9 +17,9 @@ python3 tool/package_macos_app.py \
   build/macos-package
 ```
 
-Tool downloads are SHA-256 pinned. Native USB dependencies are built from the same pinned source revisions as the existing desktop releases. The packager checks architectures, rejects external non-system dylib paths, signs the nested executables/frameworks and app, verifies the signature, and emits a `.tar.gz`, SHA-256 file and `macos-build-info.json`. A tool-source archive is generated under `.dart_tool/`. Build metadata records the source commit and whether the checkout contains changes; it is a build record, not an independently signed attestation.
+Tool downloads are SHA-256 pinned. Native USB dependencies are built from the same pinned source revisions as the existing desktop releases. The packager copies the generated build to a temporary directory to avoid Finder/File Provider metadata races, checks architectures, rejects external non-system dylib paths, signs the nested executables/frameworks and app, verifies the signature, and emits a `.tar.gz`, SHA-256 file and `macos-build-info.json`. The original build directory is left unchanged. A tool-source archive is generated under `.dart_tool/`. Build metadata records the source commit and whether the checkout contains changes; it is a build record, not an independently signed attestation.
 
-The `.app` above is directly installable. The release archive expands to `ChroMagician.app`; drag it to Applications or another writable folder. Keep all files inside the app together. Close MRUpdater and other serial-port applications before using ChroMagician. No Windows USB-driver setup is needed on macOS. Use a USB cable with data support. Firmware flashing and cartridge operations still require a physical console for final validation.
+The signed release archive expands to `ChroMagician.app`; drag it to Applications or another writable folder. Keep all files inside the app together. Close MRUpdater and other serial-port applications before using ChroMagician. No Windows USB-driver setup is needed on macOS. Use a USB cable with data support. Firmware flashing and cartridge operations still require a physical console for final validation.
 
 ## Signing and distribution
 

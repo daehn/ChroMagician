@@ -194,7 +194,30 @@ Future<void> main(List<String> arguments) async {
       ),
     ], app);
   }
-  final packagedCatalog = Directory(p.join(directory, 'catalog'));
+  final resources = Platform.isMacOS
+      ? p.normalize(p.join(directory, '..', 'Resources'))
+      : directory;
+  if (Platform.isMacOS) {
+    final version = await Process.run('/usr/libexec/PlistBuddy', [
+      '-c',
+      'Print :CFBundleShortVersionString',
+      p.join(directory, '..', 'Info.plist'),
+    ]);
+    if (version.exitCode != 0) {
+      throw StateError(
+        'Could not read the macOS app version: ${version.stderr}',
+      );
+    }
+    await File(p.join(resources, 'version.json')).writeAsString(
+      '${jsonEncode({'version': (version.stdout as String).trim()})}\n',
+    );
+    // Remove the previous nonstandard layout when rebuilding an existing app.
+    for (final name in ['catalog', 'firmware']) {
+      final old = Directory(p.join(directory, name));
+      if (old.existsSync()) await old.delete(recursive: true);
+    }
+  }
+  final packagedCatalog = Directory(p.join(resources, 'catalog'));
   if (packagedCatalog.existsSync()) {
     await packagedCatalog.delete(recursive: true);
   }
@@ -214,7 +237,7 @@ Future<void> main(List<String> arguments) async {
       }
     }
   }
-  final packagedFirmware = Directory(p.join(directory, 'firmware'));
+  final packagedFirmware = Directory(p.join(resources, 'firmware'));
   if (packagedFirmware.existsSync()) {
     await packagedFirmware.delete(recursive: true);
   }

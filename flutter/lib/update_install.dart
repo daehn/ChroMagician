@@ -32,10 +32,7 @@ Future<String> bundleVersion(Directory bundle) async =>
     (jsonDecode(
               await File(
                 Directory(p.join(bundle.path, 'Contents')).existsSync()
-                    ? p.join(
-                        bundle.path,
-                        'Contents/Frameworks/App.framework/Resources/flutter_assets/version.json',
-                      )
+                    ? p.join(bundle.path, 'Contents/Resources/version.json')
                     : p.join(bundle.path, 'data/flutter_assets/version.json'),
               ).readAsString(),
             )

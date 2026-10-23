@@ -6,8 +6,29 @@ import 'package:path/path.dart' as p;
 import 'package:chromatic_pc_backup/app_update.dart';
 import 'package:chromatic_pc_backup/releases.dart';
 import 'package:chromatic_pc_backup/update_install.dart';
+import 'package:chromatic_pc_backup/desktop_resources.dart';
+import 'package:chromatic_pc_backup/firmware_releases.dart';
 
 void main() {
+  test(
+    'Mac resources live beside MacOS while other platforms use executable directory',
+    () {
+      const executable =
+          '/Applications/ChroMagician.app/Contents/MacOS/chromatic_pc_backup';
+      expect(
+        desktopResourcePath('firmware', executable: executable, isMacOS: true),
+        '/Applications/ChroMagician.app/Contents/Resources/firmware',
+      );
+      expect(
+        desktopResourcePath(
+          'catalog',
+          executable: '/opt/app/chromagician',
+          isMacOS: false,
+        ),
+        '/opt/app/catalog',
+      );
+    },
+  );
   late Directory root;
   setUp(() async {
     final temporary = await Directory.systemTemp.createTemp(
@@ -17,27 +38,25 @@ void main() {
   });
   tearDown(() async => root.delete(recursive: true));
 
-  test('Mac bundle paths resolve helpers and version inside Contents', () async {
-    final macos = await Directory(
-      p.join(root.path, 'ChroMagician.app/Contents/MacOS'),
-    ).create(recursive: true);
-    final app = macos.parent.parent;
-    final version = File(
-      p.join(
+  test(
+    'Mac bundle paths resolve helpers and version inside Contents',
+    () async {
+      final macos = await Directory(
+        p.join(root.path, 'ChroMagician.app/Contents/MacOS'),
+      ).create(recursive: true);
+      final app = macos.parent.parent;
+      final version = File(p.join(app.path, 'Contents/Resources/version.json'));
+      await version.create(recursive: true);
+      await version.writeAsString('{"version":"1.2.3"}');
+      expect(
+        applicationDirectory(p.join(macos.path, 'chromatic_pc_backup')).path,
         app.path,
-        'Contents/Frameworks/App.framework/Resources/flutter_assets/version.json',
-      ),
-    );
-    await version.create(recursive: true);
-    await version.writeAsString('{"version":"1.2.3"}');
-    expect(
-      applicationDirectory(p.join(macos.path, 'chromatic_pc_backup')).path,
-      app.path,
-    );
-    expect(bundleExecutable(app), 'Contents/MacOS/chromatic_pc_backup');
-    expect(bundleHelper(app), 'Contents/MacOS/libexec/chromagician-update');
-    expect(await bundleVersion(app), '1.2.3');
-  });
+      );
+      expect(bundleExecutable(app), 'Contents/MacOS/chromatic_pc_backup');
+      expect(bundleHelper(app), 'Contents/MacOS/libexec/chromagician-update');
+      expect(await bundleVersion(app), '1.2.3');
+    },
+  );
 
   for (final extra in [
     ArchiveFile.string('ChroMagician.app/../../escape', 'bad'),
@@ -99,6 +118,15 @@ void main() {
         await bundleVersion(Directory(p.join(root.path, 'ChroMagician.app'))),
         version,
       );
+      final firmware = await firmwareToolConfiguration(
+        directory: p.join(
+          root.path,
+          'ChroMagician.app/Contents/Resources/firmware',
+        ),
+      );
+      for (final command in firmware.tools.values) {
+        expect(await File(command.first).exists(), true);
+      }
     },
     skip:
         !Platform.isMacOS ||

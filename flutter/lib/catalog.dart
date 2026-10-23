@@ -7,6 +7,8 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import 'desktop_resources.dart';
+
 typedef Json = Map<String, dynamic>;
 
 String? cartridgeKey(Json header) {
@@ -98,9 +100,7 @@ class GameCatalog extends CartCatalog {
     } else if (url.isNotEmpty) {
       source = Uri.parse(url.endsWith('/') ? url : '$url/');
     } else {
-      final packaged = Directory(
-        p.join(p.dirname(Platform.resolvedExecutable), 'catalog'),
-      );
+      final packaged = Directory(desktopResourcePath('catalog'));
       source = await packaged.exists()
           ? packaged.uri
           : Uri.parse('https://chromagic.org/');
@@ -189,8 +189,7 @@ class GameCatalog extends CartCatalog {
     try {
       await file.parent.create(recursive: true);
       await file.writeAsBytes(data, flush: true);
-    } on FileSystemException {
-    }
+    } on FileSystemException {}
   }
 
   Future<Json> _loadManifest() async {
@@ -351,8 +350,7 @@ class GameCatalog extends CartCatalog {
     if (cover != null) {
       try {
         bytes = await _asset(cover);
-      } on Object {
-      }
+      } on Object {}
     }
     return GameMetadata(
       record,

@@ -64,7 +64,7 @@ void main() {
           p.join(
             pair.$1.path,
             Platform.isMacOS
-                ? 'Contents/Frameworks/App.framework/Resources/flutter_assets/version.json'
+                ? 'Contents/Resources/version.json'
                 : 'data/flutter_assets/version.json',
           ),
         );
