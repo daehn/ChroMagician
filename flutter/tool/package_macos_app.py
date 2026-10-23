@@ -2,7 +2,6 @@
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -29,12 +28,8 @@ def main():
     binaries = []
     # Finder/File Provider metadata is not allowed in signed bundles. Remove
     # only these packaging attributes; do not strip quarantine/security flags.
-    for entry in [app, *app.rglob('*')]:
-        if entry.is_symlink():
-            continue
-        for attribute in ('com.apple.FinderInfo', 'com.apple.ResourceFork'):
-            if attribute in os.listxattr(entry):
-                os.removexattr(entry, attribute)
+    for attribute in ('com.apple.FinderInfo', 'com.apple.ResourceFork'):
+        run('/usr/bin/xattr', '-rd', attribute, str(app))
     for file in app.rglob('*'):
         if file.is_symlink() or not file.is_file():
             continue
