@@ -208,6 +208,30 @@ Future<void> main(List<String> arguments) async {
     await packageFirmwareTools(Directory(firmwareDirectory), packagedFirmware);
   }
   await removeRetiredBundleFiles(Directory(directory));
+  if (Platform.isMacOS) {
+    // Xcode seals the bundle before the backend is copied in, so sign the
+    // nested executable and then reseal the app around it.
+    final identity = Platform.environment['CHROMATIC_CODESIGN_IDENTITY'] ?? '-';
+    final bundle = p.dirname(p.dirname(directory));
+    await run('codesign', [
+      '--force',
+      '--sign',
+      identity,
+      '--options',
+      'runtime',
+      '--timestamp=none',
+      binary.path,
+    ], app);
+    await run('codesign', [
+      '--force',
+      '--sign',
+      identity,
+      '--preserve-metadata=entitlements,requirements,flags',
+      '--timestamp=none',
+      bundle,
+    ], app);
+    await run('codesign', ['--verify', '--strict', bundle], app);
+  }
   if (Platform.isLinux) {
     await publishBundle(Directory(directory), Directory(installedDirectory));
   }
