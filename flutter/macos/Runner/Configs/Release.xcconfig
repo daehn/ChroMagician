@@ -1,2 +1,5 @@
 #include "../../Flutter/Flutter-Release.xcconfig"
 #include "Warnings.xcconfig"
+
+// The release packager signs the completed app after embedding native tools.
+CODE_SIGNING_ALLOWED = NO

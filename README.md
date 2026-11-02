@@ -17,21 +17,11 @@ Download an installer from [Releases](https://github.com/cursedtoast2/ChroMagici
 
 - **Windows:** the `Setup.exe` installer.
 - **Linux:** the `.deb` or `.rpm` package for your distribution.
+- **macOS (Apple Silicon):** the `macos-arm64.tar.gz` archive, when published. Extract it and move `ChroMagician.app` to Applications. See [MACOS.md](MACOS.md) for native builds and signing requirements.
 
 Portable packages are also available. Flashing tools and their runtimes are included.
 
-**macOS (Apple silicon):** no package is published yet. Build from source with Xcode, Rust, CocoaPods and Flutter 3.44.6:
-
-```sh
-cd flutter
-flutter pub get --enforce-lockfile
-dart run tool/build_desktop.dart --catalog-url https://chromagic.org
-open build/macos/Build/Products/Release/chromatic_pc_backup.app
-```
-
-The app is signed ad-hoc; set `CHROMATIC_CODESIGN_IDENTITY` to sign with your own identity. Cartridge backup and SD tools work without extra software. Firmware installation and automatic updates are not available on macOS yet. MRUpdater's USB setup is only needed on Windows and Linux.
-
-Run [ModRetro's MRUpdater](https://support.modretro.com/en_us/chromatic-firmware-updater-ryhoYnzCx) and complete its USB setup, then close it before opening ChroMagician.
+On Windows and Linux, run [ModRetro's MRUpdater](https://support.modretro.com/en_us/chromatic-firmware-updater-ryhoYnzCx) and complete its USB setup, then close it before opening ChroMagician.
 
 ## Connect your Chromatic
 

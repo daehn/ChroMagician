@@ -12,19 +12,37 @@ String get appExecutable =>
 String get updateHelper =>
     Platform.isWindows ? 'chromagician-update.exe' : 'chromagician-update';
 
+Directory applicationDirectory(String executable) {
+  final directory = File(executable).parent;
+  return p.basename(directory.path) == 'MacOS' &&
+          p.basename(directory.parent.path) == 'Contents'
+      ? directory.parent.parent
+      : directory;
+}
+
+String bundleExecutable(Directory bundle) =>
+    Directory(p.join(bundle.path, 'Contents', 'MacOS')).existsSync()
+    ? p.join('Contents', 'MacOS', appExecutable)
+    : appExecutable;
+
+String bundleHelper(Directory bundle) =>
+    p.join(p.dirname(bundleExecutable(bundle)), 'libexec', updateHelper);
+
 Future<String> bundleVersion(Directory bundle) async =>
     (jsonDecode(
               await File(
-                p.join(bundle.path, 'data/flutter_assets/version.json'),
+                Directory(p.join(bundle.path, 'Contents')).existsSync()
+                    ? p.join(bundle.path, 'Contents/Resources/version.json')
+                    : p.join(bundle.path, 'data/flutter_assets/version.json'),
               ).readAsString(),
             )
             as Map)['version']
         as String;
 
 Future<void> acknowledgeAppUpdate() async {
-  if (!Platform.isLinux && !Platform.isWindows) return;
+  if (!Platform.isLinux && !Platform.isWindows && !Platform.isMacOS) return;
   final path = Platform.environment['CHROMAGIC_UPDATE_ACK'];
-  final bundle = File(Platform.resolvedExecutable).parent;
+  final bundle = applicationDirectory(Platform.resolvedExecutable);
   if (path != null) {
     final ack = File(path);
     if (p.basename(path) == 'started.json' &&
@@ -82,8 +100,7 @@ Future<void> cleanupCompletedUpdates(
       if (!waiting) return;
       await Future<void>.delayed(const Duration(milliseconds: 200));
     } while (DateTime.now().isBefore(deadline));
-  } on Object {
-  }
+  } on Object {}
 }
 
 Future<void> renameUpdateDirectory(Directory source, String destination) async {
@@ -125,8 +142,7 @@ Future<void> updateWindowsInstalledVersion(
         'CHROMAGIC_INSTALL_VERSION': version,
       },
     );
-  } on ProcessException {
-  }
+  } on ProcessException {}
 }
 
 Future<void> installUpdate(File planFile) async {
@@ -134,9 +150,16 @@ Future<void> installUpdate(File planFile) async {
       jsonDecode(await planFile.readAsString()) as Map<String, dynamic>;
   final work = planFile.parent;
   final target = Directory(plan['target'] as String);
-  final incoming = Directory(p.join(work.path, 'ChroMagician'));
+  final incoming = Directory(
+    p.join(
+      work.path,
+      Directory(p.join(target.path, 'Contents')).existsSync()
+          ? 'ChroMagician.app'
+          : 'ChroMagician',
+    ),
+  );
   final previous = Directory(p.join(work.path, 'previous'));
-  if ((!Platform.isLinux && !Platform.isWindows) ||
+  if ((!Platform.isLinux && !Platform.isWindows && !Platform.isMacOS) ||
       plan['identity'] is! String ||
       !p.basename(work.path).startsWith('.chromagician-update-') ||
       !p.equals(await work.parent.resolveSymbolicLinks(), target.parent.path) ||
@@ -186,7 +209,7 @@ Future<void> installUpdate(File planFile) async {
       ..['CHROMAGIC_UPDATE_WORK'] = work.path
       ..['CHROMAGIC_UPDATE_ACK'] = p.join(work.path, 'started.json');
     final child = await Process.start(
-      p.join(target.path, appExecutable),
+      p.join(target.path, bundleExecutable(target)),
       [],
       workingDirectory: target.path,
       environment: environment,
@@ -205,8 +228,7 @@ Future<void> installUpdate(File planFile) async {
             committed = true;
             break;
           }
-        } on FormatException {
-        }
+        } on FormatException {}
       }
       if (childIdentity == null ||
           await processIdentity(child.pid) != childIdentity) {
@@ -234,7 +256,7 @@ Future<void> installUpdate(File planFile) async {
         ..['CHROMAGIC_UPDATE_WORK'] = work.path
         ..['CHROMAGIC_UPDATE_FAILED'] = '1';
       await Process.start(
-        p.join(target.path, appExecutable),
+        p.join(target.path, bundleExecutable(target)),
         [],
         workingDirectory: target.path,
         environment: environment,
@@ -260,8 +282,7 @@ Future<void> installUpdate(File planFile) async {
         } else if (committed || movedOld) {
           await work.delete(recursive: true);
         }
-      } on FileSystemException {
-      }
+      } on FileSystemException {}
     }
   }
 }

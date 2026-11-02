@@ -1,5 +1,6 @@
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart' as win;
 
@@ -14,12 +15,37 @@ Future<String?> linuxProcessIdentity(int processId) async {
 }
 
 Future<String?> processIdentity(int processId) async {
+  if (Platform.isMacOS) return macosProcessIdentity(processId);
   if (!Platform.isWindows) return linuxProcessIdentity(processId);
   final process = _WindowsProcess.open(processId);
   try {
     return process?.running == true ? process!.identity : null;
   } finally {
     process?.close();
+  }
+}
+
+// Darwin proc_bsdinfo: the kernel supplies the process's start time in
+// microseconds, so an updater cannot mistake a reused PID for the old app.
+String? macosProcessIdentity(int processId) {
+  if (processId <= 0) return null;
+  final query = DynamicLibrary.open('/usr/lib/libproc.dylib')
+      .lookupFunction<
+        Int32 Function(Int32, Int32, Uint64, Pointer<Void>, Int32),
+        int Function(int, int, int, Pointer<Void>, int)
+      >('proc_pidinfo');
+  const size = 136;
+  final buffer = calloc<Uint8>(size);
+  try {
+    if (query(processId, 3, 0, buffer.cast(), size) != size) return null;
+    final data = ByteData.sublistView(buffer.asTypedList(size));
+    if (data.getUint32(4, Endian.little) == 5 ||
+        data.getUint32(12, Endian.little) != processId) {
+      return null;
+    }
+    return '${data.getUint64(120, Endian.little)}:${data.getUint64(128, Endian.little)}';
+  } finally {
+    calloc.free(buffer);
   }
 }
 

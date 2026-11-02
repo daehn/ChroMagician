@@ -363,7 +363,7 @@ mod tests {
             mpsc,
         };
         for baud in [115_200, 2_000_000] {
-            let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+            let (mut client, mut device) = crate::test_serial_pair().unwrap();
             client.set_timeout(Duration::from_millis(25)).unwrap();
             device.set_timeout(Duration::from_millis(25)).unwrap();
             let (reset, resets) = mpsc::channel();
@@ -434,7 +434,7 @@ mod tests {
             atomic::{AtomicBool, Ordering},
             mpsc,
         };
-        let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+        let (mut client, mut device) = crate::test_serial_pair().unwrap();
         client.set_timeout(Duration::from_millis(25)).unwrap();
         device.set_timeout(Duration::from_millis(25)).unwrap();
         let (reset, resets) = mpsc::channel();
@@ -505,7 +505,7 @@ mod tests {
     #[test]
     fn unresponsive_post_flash_console_has_a_bounded_reset_count() {
         use serialport::SerialPort as _;
-        let (mut client, _device) = serialport::TTYPort::pair().unwrap();
+        let (mut client, _device) = crate::test_serial_pair().unwrap();
         client.set_timeout(Duration::from_millis(25)).unwrap();
         let mut restarts = 0;
         let started = Instant::now();
@@ -524,7 +524,7 @@ mod tests {
     #[test]
     fn passive_query_never_restarts_an_unresponsive_console() {
         use serialport::SerialPort as _;
-        let (mut client, _device) = serialport::TTYPort::pair().unwrap();
+        let (mut client, _device) = crate::test_serial_pair().unwrap();
         client.set_timeout(Duration::from_millis(25)).unwrap();
         assert!(
             query_versions(&mut client, false, None, |_| panic!(
@@ -539,7 +539,7 @@ mod tests {
     fn reads_mode_and_physical_presence_without_opening_a_cart_session() {
         use serialport::SerialPort as _;
         use std::io::{Read as _, Write as _};
-        let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+        let (mut client, mut device) = crate::test_serial_pair().unwrap();
         client.set_timeout(Duration::from_millis(50)).unwrap();
         device.set_timeout(Duration::from_secs(2)).unwrap();
         let peer = std::thread::spawn(move || {
@@ -586,7 +586,7 @@ mod tests {
         use serialport::SerialPort as _;
         use std::io::{Read as _, Write as _};
         for baud in [115_200, 2_000_000] {
-            let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+            let (mut client, mut device) = crate::test_serial_pair().unwrap();
             client.set_baud_rate(baud).unwrap();
             client.set_timeout(Duration::from_millis(50)).unwrap();
             device.set_timeout(Duration::from_secs(2)).unwrap();
@@ -609,7 +609,7 @@ mod tests {
     #[test]
     fn silent_startup_is_bounded_and_never_restarts_the_mcu() {
         use serialport::SerialPort as _;
-        let (mut client, _device) = serialport::TTYPort::pair().unwrap();
+        let (mut client, _device) = crate::test_serial_pair().unwrap();
         client.set_timeout(Duration::from_millis(25)).unwrap();
         let started = Instant::now();
         let result = query_versions(&mut client, false, None, |_| {
@@ -647,7 +647,7 @@ mod tests {
             (115_200, 0, true),
             (2_000_000, 0, true),
         ] {
-            let (mut client, mut device) = serialport::TTYPort::pair().unwrap();
+            let (mut client, mut device) = crate::test_serial_pair().unwrap();
             client.set_timeout(Duration::from_millis(50)).unwrap();
             device.set_timeout(Duration::from_secs(4)).unwrap();
             let (finished, wait) = std::sync::mpsc::channel();

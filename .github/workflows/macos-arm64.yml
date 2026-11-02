@@ -1,0 +1,50 @@
+name: macOS Apple Silicon app
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: flutter
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Require native Apple Silicon
+        run: test "$(uname -m)" = arm64
+      - uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: '3.44.6'
+          channel: stable
+          architecture: arm64
+          cache: true
+      - name: Build dependencies
+        run: |
+          brew install cmake pkg-config
+          flutter pub get --enforce-lockfile
+      - name: Analyze and test
+        run: |
+          flutter analyze
+          # Existing SD/workspace widget suites have failures on unmodified
+          # upstream. Exercise the port and firmware/backend regressions here.
+          flutter test --concurrency=2 test/macos_app_update_test.dart test/app_update_test.dart test/windows_app_update_test.dart test/update_helper_test.dart test/update_ui_test.dart test/firmware_test.dart test/firmware_setup_test.dart test/firmware_dialog_test.dart test/backend_test.dart test/auto_read_test.dart test/controller_test.dart test/build_desktop_test.dart test/releases_test.dart
+          cargo test --workspace --locked --manifest-path ../Cargo.toml
+      - name: Build complete native app
+        run: |
+          dart run tool/build_desktop.dart
+          python3 tool/package_macos_app.py build/macos/Build/Products/Release/chromatic_pc_backup.app build/macos-package
+          cp .dart_tool/ChroMagician-macos-tools-sources.tar.gz build/macos-package/
+      - name: Validate packaged release without hardware
+        run: |
+          export CHROMAGIC_TEST_MACOS_ARCHIVE="$PWD/build/macos-package/ChroMagician-1.0.3-macos-arm64.tar.gz"
+          flutter test test/macos_app_update_test.dart
+          build/macos/Build/Products/Release/chromatic_pc_backup.app/Contents/Resources/firmware/tools/esptool version
+          build/macos/Build/Products/Release/chromatic_pc_backup.app/Contents/Resources/firmware/tools/openFPGALoader --version
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: macos-arm64-tested
+          path: flutter/build/macos-package/*
+          retention-days: 90
+          if-no-files-found: error

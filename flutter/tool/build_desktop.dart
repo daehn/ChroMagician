@@ -49,8 +49,15 @@ Future<void> main(List<String> arguments) async {
       );
     }
   }
+  if (Platform.isMacOS) {
+    if (Abi.current() != Abi.macosArm64) {
+      throw UnsupportedError('macOS releases currently require Apple Silicon.');
+    }
+    firmwareDirectory ??= p.join(app, '.dart_tool', 'macos-tools');
+  }
   if (firmwareDirectory != null &&
       !Platform.isLinux &&
+      !Platform.isMacOS &&
       !File(p.join(firmwareDirectory, 'manifest.json')).existsSync()) {
     throw ArgumentError('Firmware directory does not contain manifest.json.');
   }
@@ -95,6 +102,13 @@ Future<void> main(List<String> arguments) async {
   if (Platform.isLinux) {
     await run('python3', [
       'tool/package_linux_tools.py',
+      '--output',
+      firmwareDirectory!,
+    ], app);
+  }
+  if (Platform.isMacOS) {
+    await run('python3', [
+      'tool/package_macos_tools.py',
       '--output',
       firmwareDirectory!,
     ], app);
@@ -168,7 +182,7 @@ Future<void> main(List<String> arguments) async {
     p.join(workspace, 'target', 'release', name),
   ).copy(p.join(libexec.path, name));
   if (!Platform.isWindows) await run('chmod', ['755', binary.path], app);
-  if (Platform.isLinux || Platform.isWindows) {
+  if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
     await run('dart', [
       'compile',
       'exe',
@@ -180,7 +194,30 @@ Future<void> main(List<String> arguments) async {
       ),
     ], app);
   }
-  final packagedCatalog = Directory(p.join(directory, 'catalog'));
+  final resources = Platform.isMacOS
+      ? p.normalize(p.join(directory, '..', 'Resources'))
+      : directory;
+  if (Platform.isMacOS) {
+    final version = await Process.run('/usr/libexec/PlistBuddy', [
+      '-c',
+      'Print :CFBundleShortVersionString',
+      p.join(directory, '..', 'Info.plist'),
+    ]);
+    if (version.exitCode != 0) {
+      throw StateError(
+        'Could not read the macOS app version: ${version.stderr}',
+      );
+    }
+    await File(p.join(resources, 'version.json')).writeAsString(
+      '${jsonEncode({'version': (version.stdout as String).trim()})}\n',
+    );
+    // Remove the previous nonstandard layout when rebuilding an existing app.
+    for (final name in ['catalog', 'firmware']) {
+      final old = Directory(p.join(directory, name));
+      if (old.existsSync()) await old.delete(recursive: true);
+    }
+  }
+  final packagedCatalog = Directory(p.join(resources, 'catalog'));
   if (packagedCatalog.existsSync()) {
     await packagedCatalog.delete(recursive: true);
   }
@@ -200,7 +237,7 @@ Future<void> main(List<String> arguments) async {
       }
     }
   }
-  final packagedFirmware = Directory(p.join(directory, 'firmware'));
+  final packagedFirmware = Directory(p.join(resources, 'firmware'));
   if (packagedFirmware.existsSync()) {
     await packagedFirmware.delete(recursive: true);
   }
@@ -208,30 +245,6 @@ Future<void> main(List<String> arguments) async {
     await packageFirmwareTools(Directory(firmwareDirectory), packagedFirmware);
   }
   await removeRetiredBundleFiles(Directory(directory));
-  if (Platform.isMacOS) {
-    // Xcode seals the bundle before the backend is copied in, so sign the
-    // nested executable and then reseal the app around it.
-    final identity = Platform.environment['CHROMATIC_CODESIGN_IDENTITY'] ?? '-';
-    final bundle = p.dirname(p.dirname(directory));
-    await run('codesign', [
-      '--force',
-      '--sign',
-      identity,
-      '--options',
-      'runtime',
-      '--timestamp=none',
-      binary.path,
-    ], app);
-    await run('codesign', [
-      '--force',
-      '--sign',
-      identity,
-      '--preserve-metadata=entitlements,requirements,flags',
-      '--timestamp=none',
-      bundle,
-    ], app);
-    await run('codesign', ['--verify', '--strict', bundle], app);
-  }
   if (Platform.isLinux) {
     await publishBundle(Directory(directory), Directory(installedDirectory));
   }
@@ -280,6 +293,8 @@ Future<void> packageFirmwareTools(
         'versions': config['versions'],
         'libraries': config['libraries'],
         if (config['pe_imports'] != null) 'pe_imports': config['pe_imports'],
+        if (config['macho_imports'] != null)
+          'macho_imports': config['macho_imports'],
       },
     }),
   );
