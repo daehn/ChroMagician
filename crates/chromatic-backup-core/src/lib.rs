@@ -292,7 +292,9 @@ pub fn discover_ports() -> Result<Vec<String>, BackupError> {
     let mut matches = serialport::available_ports()?
         .into_iter()
         .filter_map(|port| match port.port_type {
-            SerialPortType::UsbPort(info) if info.vid == USB_VID && info.pid == USB_PID => {
+            SerialPortType::UsbPort(info)
+                if is_chromatic_port(&port.port_name, info.vid, info.pid) =>
+            {
                 Some(port.port_name)
             }
             _ => None,
@@ -300,6 +302,13 @@ pub fn discover_ports() -> Result<Vec<String>, BackupError> {
         .collect::<Vec<_>>();
     matches.sort();
     Ok(matches)
+}
+
+/// macOS publishes every USB serial device twice: `/dev/cu.*` (call-out) and `/dev/tty.*`
+/// (dial-in, which blocks on carrier detect). Only the call-out node is kept so one Chromatic
+/// is reported once.
+fn is_chromatic_port(name: &str, vid: u16, pid: u16) -> bool {
+    vid == USB_VID && pid == USB_PID && (!cfg!(target_os = "macos") || name.starts_with("/dev/cu."))
 }
 
 /// Back up a cartridge while reporting structured progress through `on_event`.
@@ -1203,6 +1212,27 @@ fn sync_parent(path: &Path) -> Result<(), BackupError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chromatic_port_requires_matching_usb_ids() {
+        let name = if cfg!(target_os = "macos") {
+            "/dev/cu.usbmodem1101"
+        } else {
+            "/dev/ttyACM0"
+        };
+        assert!(is_chromatic_port(name, USB_VID, USB_PID));
+        assert!(!is_chromatic_port(name, USB_VID, USB_PID + 1));
+        assert!(!is_chromatic_port(name, USB_VID + 1, USB_PID));
+    }
+
+    #[test]
+    fn macos_keeps_only_the_call_out_node() {
+        assert!(is_chromatic_port("/dev/cu.usbmodem1101", USB_VID, USB_PID));
+        assert_eq!(
+            is_chromatic_port("/dev/tty.usbmodem1101", USB_VID, USB_PID),
+            !cfg!(target_os = "macos")
+        );
+    }
 
     #[test]
     fn title_is_decoded_and_trimmed() {
